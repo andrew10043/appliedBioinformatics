@@ -127,7 +127,7 @@ class NW:
 
         finalSeq = np.matrix([["".join(alignA)], ["".join(alignB)]])
 
-        finalScore = F.iloc[F.shape[0 - 1, F.shape[1] - 1]]
+        finalScore = F.iloc[F.shape[0] - 1, F.shape[1] - 1]
 
         if out == "F":
             return F
