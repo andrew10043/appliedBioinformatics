@@ -2,8 +2,7 @@ from iab.algorithms import blosum50
 import numpy as np
 import pandas as pd
 
-
-class NW:
+class SW:
 
     def __init__(self, seqA, seqB, gapOpen, gapExtend):
         self.seqA = seqA
@@ -11,7 +10,6 @@ class NW:
         self.gapOpen = gapOpen
         self.gapExtend = gapExtend
 
-    # Returns F and T matrix, sequence alignment and final score
     def matrix_compute(self, out):
         numRows = len(self.seqB) + 1
         numCols = len(self.seqA) + 1
@@ -22,21 +20,10 @@ class NW:
         colLabs = list(self.seqA)
         colLabs.insert(0, "")
 
+        # In the SW local matching algorithm, F is initialized with
+        # all zeros (unlike NW)
         emptyF = np.zeros(shape=(numRows, numCols), dtype=np.int)
         F = pd.DataFrame(emptyF, columns=colLabs, index=rowLabs)
-
-        # Initialize F using the following rules:
-        # F(0, 0) = 0
-        # F(i, 0) = F(i - 1, 0) - d
-        # F(0, j) = F(0, j - 1) - d
-        # Where d is gapOpen penalty
-        d = self.gapOpen
-
-        for i in range(1, F.shape[0]):
-            F.iloc[i, 0] = F.iloc[i - 1, 0] - d
-
-        for j in range(1, F.shape[1]):
-            F.iloc[0, j] = F.iloc[0, j - 1] - d
 
         # Define characters for T table
         trace = {'diag': '\u2196',
@@ -46,23 +33,24 @@ class NW:
 
         startDot = '\u25cf'
 
-        # Generate T table
+        # Build and initialize the T matrix
+        # Given the F matrix initialization with all zeros, the T matrix
+        # is inialized with startDots in the entire first row and column
+
         emptyT = np.zeros(shape=(numRows, numCols), dtype=np.int)
         T = pd.DataFrame(emptyT, columns=colLabs, index=rowLabs)
 
-        # Initialize T  such that each cell contains an arrow pointing towards
-        # the cell whose F score it depends on
-        T.iloc[0, 0] = startDot
-        for i in range(1, T.shape[0]):
-            T.iloc[i, 0] = trace['up']
-        for j in range(1, T.shape[1]):
-            T.iloc[0, j] = trace['left']
+        for i in range(0, T.shape[0]):
+            T.iloc[i, 0] = startDot
+        for j in range(0, T.shape[1]):
+            T.iloc[0, j] = startDot
 
         # Fill the F matrix with the following rules:
         # F(i, j) = max of:
-        # 1. F(i - 1, j - 1) + s(ci, cj); s(ci, cj) is the substitution score
-        # 2. F(i - 1, j) - d
-        # 3. F(i, j - 1) - d
+        # 1. 0
+        # 2. F(i - 1, j - 1) + s(ci, cj); s(ci, cj) is the substitution score
+        # 3. F(i - 1, j) - d
+        # 4. F(i, j - 1) - d
         # Gap extend (e) used in place of d if more than one adjacent gap
 
         # Fill the T matrix based on which score defines the current cell
@@ -91,24 +79,40 @@ class NW:
                 else:
                     upScore = F.iloc[i - 1, j] - d
 
-                maxScore = max(diagScore, leftScore, upScore)
+                maxScore = max(diagScore, leftScore, upScore, 0)
 
                 F.iloc[i, j] = maxScore
 
-                if maxScore == leftScore:
+                if maxScore == 0:
+                    T.iloc[i, j] = startDot
+                elif maxScore == leftScore:
                     T.iloc[i, j] = trace['left']
                 elif maxScore == diagScore:
                     T.iloc[i, j] = trace['diag']
                 elif maxScore == upScore:
                     T.iloc[i, j] = trace['up']
 
-        i = T.shape[0] - 1
-        j = T.shape[1] - 1
+        # Traceback in SW starts with the maximum F cell value, unlike
+        # NW which always starts in the bottom right corner
+        maxValue = 0.0
+        max_i = 0
+        max_j = 0
+        for i in range(F.shape[0]):
+            for j in range(F.shape[1]):
+                if F.iloc[i, j] > maxValue:
+                    max_i, max_j = i, j
+                    maxValue = F.iloc[i, j]
+
+        # In SW, traceback terminates when it reaches a startDot, which
+        # unlike NW can occur in locations other than the upper right corner
 
         alignB = []
         alignA = []
 
-        while (i, j) != (0, 0):
+        i = max_i
+        j = max_j
+
+        while T.iloc[i, j] != startDot:
             if T.iloc[i, j] == trace['diag']:
                 alignB.insert(0, T.index[i])
                 alignA.insert(0, T.columns[j])
@@ -127,7 +131,7 @@ class NW:
 
         finalSeq = np.matrix([["".join(alignA)], ["".join(alignB)]])
 
-        finalScore = F.iloc[F.shape[0 - 1, F.shape[1] - 1]]
+        finalScore = F.iloc[max_i, max_j]
 
         if out == "F":
             return F
