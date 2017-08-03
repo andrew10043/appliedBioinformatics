@@ -8,7 +8,7 @@ from skbio.sequence.distance import hamming
 from skbio.alignment import global_pairwise_align_nucleotide
 import ete3
 from iab.algorithms import evolve_generations, random_sequence, \
-    progressive_msa, kmer_distance
+    progressive_msa, kmer_distance, tree_from_distance_matrix
 
 
 # Generate random last common ancestor sequence
@@ -35,14 +35,6 @@ else:
                   penalize_terminal_gaps=True)
     sequences_aligned = progressive_msa(sequences,
                                         pairwise_aligner=gpa)
-
-ts = ete3.TreeStyle()
-ts.show_leaf_name = True
-ts.scale = 250
-ts.branch_vertical_margin = 15
-
-t = ete3.Tree()
-t.populate(10)
 
 # Plot distance matrices using various metrics for distance
 
@@ -84,3 +76,18 @@ plot = jc_dm.plot(cmap='Greens',
                   title='JC-corrected Hamming Distances between sequences')
 plot.savefig('jc_corrected_distance_matrix.png')
 
+# Implementation of UPGMA clustering to generate trees
+# Define Tree Style type
+ts = ete3.TreeStyle()
+ts.show_leaf_name = True
+ts.scale = 250
+ts.branch_vertical_margin = 15
+
+# kmer tree
+kmer_tree = tree_from_distance_matrix(kmer_dm, metric='upgma')
+ete3.Tree(str(kmer_tree), format=1).render('kmer_tree.png', tree_style=ts)
+
+# JC-corrected hamming tree
+jc_corrected_hamming_tree = tree_from_distance_matrix(jc_dm, metric='upgma')
+ete3.Tree(str(jc_corrected_hamming_tree),
+          format=1).render('jc_corrected_hamming_tree.png', tree_style=ts)
