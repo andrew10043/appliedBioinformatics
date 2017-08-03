@@ -42,5 +42,11 @@ currentQueries = random.sample(queries, k=4)
 results = local_alignment_search(currentQueries, refDB)
 stopTime = time.time()
 print("Run time: " + str((stopTime - startTime)/len(currentQueries)) +
-      " per query.")
-results
+      " seconds per query.")
+print(results)
+
+# Print actual taxonomic metadata for the query sequences to compare
+for q in currentQueries:
+    qID = q.metadata['id']
+    print("Known taxonomy for query " + str(qID) + ":\n" +
+          str(refTax[qID]))
