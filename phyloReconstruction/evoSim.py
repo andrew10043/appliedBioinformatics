@@ -1,11 +1,15 @@
-import numpy as np
 import seaborn as sns
+from functools import partial
+import numpy as np
 import random
-from iab.algorithms import evolve_generations
-from iab.algorithms import random_sequence
-from iab.algorithms import progressive_msa
-from skbio.alignment import global_pairwise_align_nucleotide
 import skbio
+from skbio import DistanceMatrix
+from skbio.sequence.distance import hamming
+from skbio.alignment import global_pairwise_align_nucleotide
+import ete3
+from iab.algorithms import evolve_generations, random_sequence, \
+    progressive_msa, kmer_distance
+
 
 # Generate random last common ancestor sequence
 sequence = random_sequence(skbio.DNA, 50)
@@ -32,7 +36,6 @@ else:
     sequences_aligned = progressive_msa(sequences,
                                         pairwise_aligner=gpa)
 
-import ete3
 ts = ete3.TreeStyle()
 ts.show_leaf_name = True
 ts.scale = 250
@@ -40,25 +43,44 @@ ts.branch_vertical_margin = 15
 
 t = ete3.Tree()
 t.populate(10)
-t.render("test.png")
 
 # Plot distance matrices using various metrics for distance
 
 # Alignment-Free (i.e. kmer)
-from iab.algorithms import kmer_distance
-from skbio import DistanceMatrix
-
 kmer_dm = DistanceMatrix.from_iterable(sequences, metric=kmer_distance,
                                        key='id')
 plot = kmer_dm.plot(cmap='Greens', title='3mer distances between sequences')
 plot.savefig('kmer_distance_matrix.png')
 
 # Aligment-based (Hamming distance) - need to align seqs first
-from skbio.sequence.distance import hamming
+
 hamming_dm = DistanceMatrix.from_iterable(sequences_aligned, metric=hamming,
                                           key='id')
 plot = hamming_dm.plot(cmap='Greens',
                        title='Hamming distances between sequences')
 plot.savefig('hamming_distance_matrix.png')
 
+
+# Jukes-Cantor correction of observed distances between sequences
+
+
+def jc_correction(p):
+    # Return max of original value and JC correction
+    # This avoids the issues of returning 'nan' values if 4/3p > 1
+    return max(p, (-3/4) * np.log(1 - (4*p/3)))
+
+
+def jc_correct_dm(dm):
+    result = np.zeros(dm.shape)
+    for i in range(dm.shape[0]):
+        for j in range(i):
+            result[i, j] = result[j, i] = jc_correction(dm[i, j])
+    return skbio.DistanceMatrix(result, ids=dm.ids)
+
+
+jc_dm = jc_correct_dm(hamming_dm)
+
+plot = jc_dm.plot(cmap='Greens',
+                  title='JC-corrected Hamming Distances between sequences')
+plot.savefig('jc_corrected_distance_matrix.png')
 
