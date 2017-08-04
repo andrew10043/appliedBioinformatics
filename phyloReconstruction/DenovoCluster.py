@@ -27,6 +27,17 @@ class DenovoCluster:
                     break
             if clustered:
                 for n, s in alignment_results:
+                    cluster.add_node(query_seq.metadata['id'], seq=query_seq)
+                    cluster.add_edge(query_seq.metadata['id'], n,
+                                     percent_similarity=s)
+                    cluster.graph['node-order'].append(query_seq.metadata['id'])
+            else:
+                new_cluster = nx.Graph(id="OTU %d" % (len(clusters) + 1))
+                new_cluster.add_node(query_seq.metadata['id'],
+                                     seq=query_seq)
+                new_cluster.graph['node-order'] = [query_seq.metadata['id']]
+                clusters.append(new_cluster)
+        return clusters, num_alignments
 
 
 def furthest_neighbor(seq, cluster, similarity_threshold, aligner)
