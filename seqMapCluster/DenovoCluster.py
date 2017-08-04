@@ -1,7 +1,5 @@
-from numpy import mean
-from functools import partial
-from skbio.alignment import local_pairwise_align_ssw, \
-    global_pairwise_align_nucleotide
+from skbio.alignment import local_pairwise_align_ssw
+import networkx as nx
 
 class DenovoCluster:
 
@@ -40,7 +38,7 @@ class DenovoCluster:
         return clusters, num_alignments
 
 
-def furthest_neighbor(seq, cluster, similarity_threshold, aligner)
+def furthest_neighbor(seq, cluster, similarity_threshold, aligner):
     alignment_results = []
     for node in cluster.nodes_iter():
         aln, _, _ = aligner(seq, cluster.node[node]['seq'])
@@ -49,3 +47,22 @@ def furthest_neighbor(seq, cluster, similarity_threshold, aligner)
         if percent_similarity < similarity_threshold:
             return False, alignment_results
     return True, alignment_results
+
+def show_clusters(clusters, print_clusters=True, plot_clusters=True,
+                  plot_labels=False):
+    G = nx.Graph()
+    for c in clusters:
+        G = nx.union(G, c)
+        if print_clusters: print("%s: %s" %
+                                 (c.graph['id'],
+                                  [s for s in c.graph['node-order']]))
+    if plot_clusters:
+        pos=nx.spring_layout(G)
+        nx.draw_networkx_nodes(G, pos, node_color='w')
+        if G.number_of_edges() > 0:
+            nx.draw_networkx_edges(G, pos)
+        if plot_labels:
+            nx.draw_networkx_labels(G, pos,
+                                    labels={d:G.node[d]['seq'].metadata['id']
+                                            for d in G.nodes()})
+        _ = plt.axis('off')
